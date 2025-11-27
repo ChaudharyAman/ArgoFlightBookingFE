@@ -18,6 +18,7 @@ export default function Navbar() {
   return (
     <header className="border-b bg-white">
       <div className="max-w-6xl mx-auto flex items-center justify-between py-3 px-4">
+        
         <Link to="/" className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xl shadow-md">
             A
@@ -28,9 +29,8 @@ export default function Navbar() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
-          <NavLink to="/" className={navLinkClass}>
-            Home
-          </NavLink>
+          <NavLink to="/" className={navLinkClass}>Home</NavLink>
+
           {user && (
             <>
               <NavLink to="/bookings" className={navLinkClass}>
@@ -41,6 +41,7 @@ export default function Navbar() {
               </NavLink>
             </>
           )}
+
           {user?.role === "admin" && (
             <NavLink to="/admin" className={navLinkClass}>
               Admin
@@ -74,9 +75,21 @@ export default function Navbar() {
                 </span>
                 <span className="text-xs text-slate-500">{user.email}</span>
               </div>
-              <div className="h-9 w-9 rounded-full bg-primarySoft flex items-center justify-center text-sm font-semibold text-primary">
-                {user.name?.charAt(0)?.toUpperCase()}
-              </div>
+
+              <Link to="/profile">
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt="avatar"
+                    className="h-9 w-9 rounded-full object-cover border border-slate-200 shadow-sm cursor-pointer"
+                  />
+                ) : (
+                  <div className="h-9 w-9 rounded-full bg-primarySoft flex items-center justify-center text-sm font-semibold text-primary cursor-pointer">
+                    {user.name?.charAt(0)?.toUpperCase()}
+                  </div>
+                )}
+              </Link>
+
               <button
                 onClick={logout}
                 className="text-xs text-slate-500 hover:text-red-500"

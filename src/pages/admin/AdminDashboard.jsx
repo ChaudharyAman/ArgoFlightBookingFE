@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
-import { adminCreateTrip, adminDeleteTrip, fetchTrips } from "../../api/trips";
-import { FaPlane } from "react-icons/fa";
+import {
+  fetchTrips,
+  adminCreateTrip,
+  adminDeleteTrip,
+  adminUpdateTrip,
+} from "../../api/trips";
+import { fetchAllBookings } from "../../api/bookings";
+
+import { FaTrash, FaEdit, FaPlane, FaCheckCircle } from "react-icons/fa";
+import "../../admin-dashboard.css/admin-dashboard.css";
 
 export default function AdminDashboard() {
   const [trips, setTrips] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
 
   const [form, setForm] = useState({
     from: "",
@@ -16,25 +27,53 @@ export default function AdminDashboard() {
     totalSeats: "",
   });
 
-  const loadTrips = async () => {
-    const { data } = await fetchTrips();
-    setTrips(data);
+  const loadData = async () => {
+    const tripsRes = await fetchTrips();
+    setTrips(tripsRes.data);
+
+    const bookingsRes = await fetchAllBookings();
+    setBookings(bookingsRes.data);
   };
 
   useEffect(() => {
-    loadTrips();
+    loadData();
   }, []);
 
-  const handleCreate = async (e) => {
+  const openEditModal = (trip) => {
+    setIsEditing(true);
+    setEditId(trip._id);
+
+    setForm({
+      from: trip.from,
+      to: trip.to,
+      date: trip.date.split("T")[0],
+      departureTime: trip.departureTime,
+      arrivalTime: trip.arrivalTime,
+      price: trip.price,
+      totalSeats: trip.totalSeats,
+    });
+
+    setShowModal(true);
+  };
+
+  const handleCreateOrUpdate = async (e) => {
     e.preventDefault();
 
-    await adminCreateTrip({
+    const payload = {
       ...form,
       price: Number(form.price),
       totalSeats: Number(form.totalSeats),
-    });
+    };
+
+    if (isEditing) {
+      await adminUpdateTrip(editId, payload);
+    } else {
+      await adminCreateTrip(payload);
+    }
 
     setShowModal(false);
+    setIsEditing(false);
+
     setForm({
       from: "",
       to: "",
@@ -45,235 +84,228 @@ export default function AdminDashboard() {
       totalSeats: "",
     });
 
-    loadTrips();
+    loadData();
   };
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this trip?")) return;
     await adminDeleteTrip(id);
-    loadTrips();
+    loadData();
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-xl font-semibold mb-4 text-darkText">
-        Admin Dashboard
-      </h1>
+    <div className="admin-container">
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <p className="text-xs text-slate-500">Total Trips</p>
-          <p className="text-2xl font-semibold text-darkText">{trips.length}</p>
+      <h1 className="admin-title">Admin Dashboard</h1>
+
+      <div className="stats-grid">
+        <div className="stats-card">
+          <p className="stats-label">Total Trips</p>
+          <p className="stats-value">{trips.length}</p>
+        </div>
+
+        <div className="stats-card">
+          <p className="stats-label">Total Bookings</p>
+          <p className="stats-value">{bookings.length}</p>
+        </div>
+
+        <div className="stats-card">
+          <p className="stats-label">Upcoming Departures</p>
+          <p className="stats-value">
+            {trips.filter((t) => new Date(t.date) >= new Date()).length}
+          </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-sm font-semibold text-darkText">
-            Trip Management
-          </h2>
+      <div className="table-box">
+        <div className="flex between" style={{ display: "flex", justifyContent: "space-between" }}>
+          <h2 className="table-title">Trip Management</h2>
           <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 rounded-full bg-primary text-white text-xs font-medium"
+            className="btn-primary"
+            onClick={() => {
+              setIsEditing(false);
+              setForm({
+                from: "",
+                to: "",
+                date: "",
+                departureTime: "",
+                arrivalTime: "",
+                price: "",
+                totalSeats: "",
+              });
+              setShowModal(true);
+            }}
           >
             + Add New Trip
           </button>
         </div>
 
-        <div className="overflow-x-auto text-xs md:text-sm">
-          <table className="w-full text-left border-collapse">
+        <div className="table-wrapper">
+          <table>
             <thead>
-              <tr className="border-b bg-slate-50">
-                <th className="py-2 px-2">Route</th>
-                <th className="py-2 px-2">Date</th>
-                <th className="py-2 px-2">Timing</th>
-                <th className="py-2 px-2">Duration</th>
-                <th className="py-2 px-2">Price</th>
-                <th className="py-2 px-2">Seats</th>
-                <th className="py-2 px-2 text-right">Actions</th>
+              <tr>
+                <th>Route</th>
+                <th>Date</th>
+                <th>Timing</th>
+                <th>Duration</th>
+                <th>Price</th>
+                <th>Seats</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
 
             <tbody>
               {trips.map((t) => (
-                <tr key={t._id} className="border-b last:border-0">
-                  <td className="py-2 px-2">
-                    {t.from} → {t.to}
+                <tr key={t._id}>
+                  <td>{t.from} → {t.to}</td>
+                  <td>{new Date(t.date).toLocaleDateString()}</td>
+
+                  <td>
+                    {t.departureTime}
+                    <FaPlane style={{ margin: "0 6px", transform: "rotate(90deg)", color: "#3b82f6" }} />
+                    {t.arrivalTime}
                   </td>
 
-                  <td className="py-2 px-2">
-                    {new Date(t.date).toLocaleDateString()}
-                  </td>
+                  <td>{t.duration}</td>
+                  <td>₹{t.price}</td>
+                  <td>{t.totalSeats}</td>
 
-                  <td className="py-2 px-2 flex items-center gap-2">
-                    <span>{t.departureTime}</span>
-                    <FaPlane className="text-primary rotate-90 text-xs" />
-                    <span>{t.arrivalTime}</span>
-                  </td>
+                  <td 
+                  className="lastTable"
+                  style={{ textAlign: "right" }}>
+                    <FaEdit
+                      className="action-icon icon-edit"
+                      onClick={() => openEditModal(t)}
+                    />
 
-                  <td className="py-2 px-2 text-slate-600">{t.duration}</td>
-
-                  <td className="py-2 px-2">₹{t.price}</td>
-
-                  <td className="py-2 px-2">{t.totalSeats}</td>
-
-                  <td className="py-2 px-2 text-right">
-                    <button
+                    <FaTrash
+                      className="action-icon icon-delete"
                       onClick={() => handleDelete(t._id)}
-                      className="text-xs text-red-500"
-                    >
-                      Delete
-                    </button>
+                    />
                   </td>
                 </tr>
               ))}
-
-              {trips.length === 0 && (
-                <tr>
-                  <td
-                    colSpan="7"
-                    className="py-4 text-center text-xs text-slate-500"
-                  >
-                    No trips yet. Click “Add New Trip” to create one.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
+
+          {trips.length === 0 && <p>No trips found.</p>}
+        </div>
+      </div>
+
+      <div className="table-box">
+        <h2 className="table-title">Booking Management</h2>
+
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Booking ID</th>
+                <th>User</th>
+                <th>Trip</th>
+                <th>Date</th>
+                <th>Seats</th>
+                <th>Status</th>
+                <th>QR</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {bookings.map((b) => (
+                <tr key={b._id}>
+                  <td>{b._id.slice(-6).toUpperCase()}</td>
+                  <td>{b.user?.name}</td>
+                  <td>{b.trip?.from} → {b.trip?.to}</td>
+                  <td>{new Date(b.trip?.date).toLocaleDateString()}</td>
+                  <td>{b.seats.join(", ")}</td>
+
+                  <td>
+                    <span
+                      className={`status-badge ${
+                        b.status === "cancelled"
+                          ? "status-cancelled"
+                          : "status-confirmed"
+                      }`}
+                    >
+                      {b.status}
+                    </span>
+                  </td>
+
+                  <td>
+                    <FaCheckCircle
+                      className={
+                        b.qrVerified
+                          ? "icon-qr-verified action-icon"
+                          : "icon-qr-unverified action-icon"
+                      }
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {bookings.length === 0 && <p>No bookings found.</p>}
         </div>
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
-          <div className="bg-white rounded-2xl shadow-card p-6 w-full max-w-md">
-            <h3 className="text-sm font-semibold text-darkText mb-4">
-              Trip Details
+        <div className="modal-bg">
+          <div className="modal-box">
+            <h3 className="modal-title">
+              {isEditing ? "Edit Trip" : "Add Trip"}
             </h3>
 
-            <form onSubmit={handleCreate} className="space-y-3 text-sm">
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">From</label>
-                <input
-                  type="text"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2"
-                  value={form.from}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, from: e.target.value }))
-                  }
-                  required
-                />
-              </div>
+            <form onSubmit={handleCreateOrUpdate}>
+              {[
+                "from",
+                "to",
+                "date",
+                "departureTime",
+                "arrivalTime",
+                "price",
+                "totalSeats",
+              ].map((field) => (
+                <div className="modal-field" key={field}>
+                  <label>{field.replace(/([A-Z])/g, " $1")}</label>
 
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">To</label>
-                <input
-                  type="text"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2"
-                  value={form.to}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, to: e.target.value }))
-                  }
-                  required
-                />
-              </div>
+                  <input
+                    type={
+                      field.includes("Time")
+                        ? "time"
+                        : field === "date"
+                        ? "date"
+                        : "text"
+                    }
+                    value={form[field]}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        [field]: e.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+              ))}
 
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">Date</label>
-                <input
-                  type="date"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2"
-                  value={form.date}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, date: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">
-                  Departure Time
-                </label>
-                <input
-                  type="time"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2"
-                  value={form.departureTime}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      departureTime: e.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">
-                  Arrival Time
-                </label>
-                <input
-                  type="time"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2"
-                  value={form.arrivalTime}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      arrivalTime: e.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">Price</label>
-                <input
-                  type="number"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2"
-                  value={form.price}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, price: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">
-                  Total Seats
-                </label>
-                <input
-                  type="number"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2"
-                  value={form.totalSeats}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, totalSeats: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="modal-actions">
                 <button
                   type="button"
+                  className="btn-cancel"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-full border border-slate-200 text-xs"
                 >
                   Cancel
                 </button>
 
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-full bg-primary text-white text-xs font-medium"
-                >
-                  Submit
+                <button type="submit" className="btn-submit">
+                  {isEditing ? "Update" : "Submit"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 }
