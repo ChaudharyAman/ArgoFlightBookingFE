@@ -74,6 +74,3 @@ This is **frontend only** — requires a backend (Node/Express) for storing trip
 | **Package Manager** | npm / yarn |
 
 ---
-
-## 🏗 Project Architecture
-
